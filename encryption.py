@@ -1,6 +1,7 @@
 """Utility functions for AES encryption using bit-string keys."""
 
 from Cryptodome.Cipher import AES  # pycryptodomex
+from Cryptodome.Random import get_random_bytes
 
 def _pkcs7_pad(data: bytes, block: int = 16) -> bytes:
     """Apply PKCS7 padding."""
@@ -20,14 +21,22 @@ def _bits_to_key(key_bits: str) -> bytes:
     return (key + b'\x00' * 16)[:16]  # exactly 16 bytes
 
 def encrypt_message_AES(key_bits: str, plaintext: str) -> bytes:
-    """Encrypt ``plaintext`` with AES-ECB using ``key_bits``."""
+    """Encrypt ``plaintext`` with AES-GCM using ``key_bits``.
+
+    The returned bytes contain the random nonce, ciphertext, and tag.
+    """
     key = _bits_to_key(key_bits)
-    cipher = AES.new(key, AES.MODE_ECB)
-    return cipher.encrypt(_pkcs7_pad(plaintext.encode(), 16))
+    nonce = get_random_bytes(12)
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    ciphertext, tag = cipher.encrypt_and_digest(plaintext.encode())
+    return nonce + ciphertext + tag
 
 def decrypt_message_AES(key_bits: str, ciphertext: bytes) -> str:
-    """Decrypt ``ciphertext`` with AES-ECB using ``key_bits``."""
+    """Decrypt bytes produced by :func:`encrypt_message_AES`."""
     key = _bits_to_key(key_bits)
-    cipher = AES.new(key, AES.MODE_ECB)
-    plain = cipher.decrypt(ciphertext)
-    return _pkcs7_unpad(plain).decode()
+    nonce = ciphertext[:12]
+    tag = ciphertext[-16:]
+    data = ciphertext[12:-16]
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    plain = cipher.decrypt_and_verify(data, tag)
+    return plain.decode()

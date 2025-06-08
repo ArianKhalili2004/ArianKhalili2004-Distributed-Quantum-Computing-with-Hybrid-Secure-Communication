@@ -84,7 +84,11 @@ def apply_diffuser(qc: QuantumCircuit, n: int, ancilla_idxs=None):
 
 # تابع اصلی ---------------------------------------------------------------
 def distributed_grover_search(nodes, target_state: str, qchannel=None, log_fn=None):
-    """Run distributed Grover search returning the most likely state."""
+    """Simulate Grover search across ``nodes``.
+
+    Each node sequentially applies the oracle and diffuser while optional
+    communication delays are imposed by ``qchannel``.
+    """
 
     def log(msg):
         if log_fn:
@@ -100,13 +104,16 @@ def distributed_grover_search(nodes, target_state: str, qchannel=None, log_fn=No
 
     iters = max(1, math.floor((math.pi/4)*math.sqrt(2**n)))
     for i in range(iters):
-        log(f"🌀 Iteration {i+1}/{iters}: applying oracle…")
-        apply_oracle(qc, target_state[::-1], anc)
-        if qchannel and qchannel.delay: time.sleep(qchannel.delay)
-
-        log(f"✨ Iteration {i+1}/{iters}: applying diffuser…")
-        apply_diffuser(qc, n, anc)
-        if qchannel and qchannel.delay: time.sleep(qchannel.delay)
+        for node in nodes:
+            log(f"🌀 Node {node.name}: oracle step {i+1}/{iters}")
+            apply_oracle(qc, target_state[::-1], anc)
+            if qchannel and qchannel.delay:
+                time.sleep(qchannel.delay)
+        for node in nodes:
+            log(f"✨ Node {node.name}: diffuser step {i+1}/{iters}")
+            apply_diffuser(qc, n, anc)
+            if qchannel and qchannel.delay:
+                time.sleep(qchannel.delay)
 
     qc.measure(range(n), range(n))
     res = _run(qc, shots=1024)
