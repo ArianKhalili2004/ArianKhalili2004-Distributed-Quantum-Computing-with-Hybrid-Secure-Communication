@@ -1,0 +1,8 @@
+qiskit
+qiskit-aer
+pycryptodomex
+matplotlib
+networkx
+pandas
+tk
+pytest
