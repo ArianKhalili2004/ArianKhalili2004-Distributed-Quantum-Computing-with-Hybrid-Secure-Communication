@@ -1,13 +1,17 @@
-# qkd.py  ─────────────────────────────────────────────────────
+"""Simple implementation of the BB84 key exchange protocol."""
+
 import random
 from channels import QuantumChannel, ClassicalChannel
 from nodes import QuantumNode
 
-def bb84_key_exchange(alice: QuantumNode,
-                      bob: QuantumNode,
-                      key_length: int,
-                      qchannel: QuantumChannel,
-                      cchannel: ClassicalChannel):
+def bb84_key_exchange(
+    alice: QuantumNode,
+    bob: QuantumNode,
+    key_length: int,
+    qchannel: QuantumChannel,
+    cchannel: ClassicalChannel,
+) -> str | None:
+    """Perform a BB84 key exchange and store the shared key."""
 
     initial = key_length * 3
     a_bits   = [random.randint(0, 1) for _ in range(initial)]
@@ -31,7 +35,7 @@ def bb84_key_exchange(alice: QuantumNode,
     cchannel.send(alice.name, bob.name, test_bits)
 
     if any(raw_a[i] != raw_b[i] for i in test_idx):
-        return None                       # شنود یا نویز زیاد
+        return None  # heavy eavesdropping or noise
 
     for i in sorted(test_idx, reverse=True):
         raw_a.pop(i)
