@@ -1,15 +1,16 @@
-# gro
-import math, time
-from qiskit import QuantumCircuit, transpile
+"""Minimal distributed Grover search utilities."""
 
-# انتخاب شبیه‌ساز
+import math
+import time
+from qiskit import QuantumCircuit, transpile
 
 from qiskit_aer import Aer
 _backend = Aer.get_backend('qasm_simulator')
 
 
-# اجراکننده با compatibility
+# A helper to run circuits regardless of qiskit version
 def _run(circuit, shots=1024):
+    """Execute ``circuit`` on the simulator and return the result."""
     try:
         from qiskit import execute
         job = execute(circuit, _backend, shots=shots)
@@ -17,8 +18,9 @@ def _run(circuit, shots=1024):
         job = _backend.run(transpile(circuit, _backend), shots=shots)
     return job.result()
 
-# اوراکل و دیفیوزر -----------------------------------------------------------
+# Oracle and diffuser ---------------------------------------------------------
 def apply_oracle(qc: QuantumCircuit, target: str, anc=None):
+    """Apply the Grover oracle for ``target`` on ``qc``."""
     n = len(target)
     controls = list(range(n - 1))
     last = n - 1
@@ -47,6 +49,7 @@ def apply_oracle(qc: QuantumCircuit, target: str, anc=None):
         if b == '0':
             qc.x(i)
 def apply_diffuser(qc: QuantumCircuit, n: int, ancilla_idxs=None):
+    """Apply the Grover diffuser on ``n`` qubits."""
     # ➊ H روی همهٔ کیوبیت‌های داده
     for q in range(n):
         qc.h(q)
@@ -81,8 +84,11 @@ def apply_diffuser(qc: QuantumCircuit, n: int, ancilla_idxs=None):
 
 # تابع اصلی ---------------------------------------------------------------
 def distributed_grover_search(nodes, target_state: str, qchannel=None, log_fn=None):
+    """Run distributed Grover search returning the most likely state."""
+
     def log(msg):
-        if log_fn: log_fn(msg)
+        if log_fn:
+            log_fn(msg)
 
     n = len(target_state)
     anc_cnt = max(0, n-3)

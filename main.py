@@ -1,5 +1,7 @@
+"""Graphical interface for running quantum communication demos."""
 
-import math, threading, tkinter as tk
+import threading
+import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
@@ -13,12 +15,16 @@ from encryption import encrypt_message_AES, decrypt_message_AES
 from grover import distributed_grover_search
 from visualize import plot_performance
 
+
 class App(tk.Tk):
+    """Main GUI application for demonstrating the network protocols."""
+
     def __init__(self):
+        """Initialize all widgets and state."""
         super().__init__()
         self.title("Distributed Quantum Demo (Multi-node)")
         self.geometry("1000x860")
-        self.pos = {}  
+        self.pos = {}
 
 
         top = ttk.Frame(self); top.pack(fill='x', padx=12, pady=8)
@@ -56,17 +62,22 @@ class App(tk.Tk):
         self.canvas = FigureCanvasTkAgg(fig, master=self)
         self.canvas.get_tk_widget().pack(fill='both', expand=True, padx=12, pady=8)
 
-    def log_print(self, txt):
+    def log_print(self, txt: str) -> None:
+        """Append ``txt`` to the log window."""
         self.log.insert('end', txt + '\n')
         self.log.see('end')
 
-    def draw_hist(self, data):
+    def draw_hist(self, data) -> None:
+        """Draw the Grover outcome histogram."""
         self.ax_hist.clear()
         self.ax_hist.bar(data.keys(), data.values())
         self.ax_hist.set_title("Grover Histogram")
         self.canvas.draw()
 
-    def draw_network(self, nodes, links, highlights=[]):
+    def draw_network(self, nodes, links, highlights=None) -> None:
+        """Visualize the quantum network graph."""
+        if highlights is None:
+            highlights = []
         self.ax_net.clear()
         G = nx.Graph()
         for node in nodes:
@@ -83,7 +94,8 @@ class App(tk.Tk):
         self.ax_net.set_title("Quantum Network")
         self.canvas.draw()
 
-    def progress_ctl(self, action, value=0):
+    def progress_ctl(self, action: str, value: int = 0) -> None:
+        """Update the progress bar based on ``action``."""
         if action == 'start':
             self.after(0, lambda: self.prog.config(value=0))
         elif action == 'update':
@@ -91,22 +103,32 @@ class App(tk.Tk):
         elif action == 'stop':
             self.after(0, lambda: self.prog.config(value=100))
 
-    def start_thread(self):
+    def start_thread(self) -> None:
+        """Launch the full scenario in a background thread."""
         self.log.delete('1.0', 'end')
         self.ax_hist.clear(); self.ax_net.clear(); self.canvas.draw()
         target = self.target_var.get().strip()
         th = threading.Thread(target=self.run_scenario, args=(target,), daemon=True)
         th.start()
 
-    def run_grover_thread(self):
+    def run_grover_thread(self) -> None:
+        """Run only the Grover search in a background thread."""
         target = self.target_var.get().strip()
         th = threading.Thread(target=self.run_grover_only, args=(target,), daemon=True)
         th.start()
 
-    def run_scenario(self, target_bits):
-        def log(x): self.after(0, self.log_print, x)
-        def draw_hist(data): self.after(0, self.draw_hist, data)
-        def draw_net(nodes, links, highlights=[]):
+    def run_scenario(self, target_bits: str) -> None:
+        """Execute the full QKD and message passing scenario."""
+
+        def log(x):
+            self.after(0, self.log_print, x)
+
+        def draw_hist(data):
+            self.after(0, self.draw_hist, data)
+
+        def draw_net(nodes, links, highlights=None):
+            if highlights is None:
+                highlights = []
             self.after(0, self.draw_network, nodes, links, highlights)
         self.progress_ctl('start')
         total_steps = (len(target_bits) + 1) * 2
@@ -122,7 +144,7 @@ class App(tk.Tk):
             eaves = self.eaves_var.get()
             q_chan = QuantumChannel(delay=delay, eavesdrop_rate=eaves)
             c_chan = ClassicalChannel(delay=delay)
-            log(f"Gereh-ha va kanal-ha sakhte shod. Delay={delay}s, Eaves={eaves}")
+            log(f"Nodes and channels created. Delay={delay}s, Eaves={eaves}")
 
             total_qkd_time = 0
             for i in range(len(nodes) - 1):
@@ -132,7 +154,7 @@ class App(tk.Tk):
                 key = bb84_key_exchange(n1, n2, 128, q_chan, c_chan)
                 t1 = time.time()
                 if key is None:
-                    log("❌ QKD failed: احتمال شنود یا نویز زیاد.")
+                    log("❌ QKD failed: high eavesdropping or noise.")
                     return
                 total_qkd_time += (t1 - t0)
                 step += 1
@@ -161,18 +183,25 @@ class App(tk.Tk):
         finally:
             self.progress_ctl('stop')
 
-    def run_grover_only(self, target_bits):
-        def log(x): self.after(0, self.log_print, x)
-        def draw_hist(data): self.after(0, self.draw_hist, data)
-        def draw_net(nodes, links, highlights=[]):
+    def run_grover_only(self, target_bits: str) -> None:
+        """Execute only the Grover search demonstration."""
+        def log(x):
+            self.after(0, self.log_print, x)
+
+        def draw_hist(data):
+            self.after(0, self.draw_hist, data)
+
+        def draw_net(nodes, links, highlights=None):
+            if highlights is None:
+                highlights = []
             self.after(0, self.draw_network, nodes, links, highlights)
-        log("Ejra-ye Grover…")
+        log("Running Grover…")
         nodes = [QuantumNode("A", len(target_bits)), QuantumNode("B", len(target_bits))]
         q_chan = QuantumChannel(delay=self.delay_var.get(), eavesdrop_rate=0.0)
         t0 = time.time()
         state, counts = distributed_grover_search(nodes, target_bits, q_chan, log_fn=log)
         t1 = time.time()
-        log(f"✅ Natije: {state}")
+        log(f"✅ Result: {state}")
         draw_hist(counts)
         plot_performance(qkd_time=0, grover_delay=t1 - t0,
                          key_bits=0, iters=len(counts))
